@@ -1,5 +1,6 @@
-from keras.layers.convolutional import Conv3D
-from keras.layers.convolutional import MaxPooling3D
+from keras.layers.convolutional import Convolution3D
+from keras.layers import Conv3D
+from keras.layers.convolutional import MaxPooling3D, ZeroPadding3D
 from keras.models import Sequential
 from keras.layers import Dense
 from keras.layers import Flatten
@@ -38,7 +39,7 @@ def generate_data(training_filename, training_label, batch_size, category_name):
             for frame_number in range(16):
                 current_frame = 4 * frame_number + 10
                 image = cv2.imread(source + '/' + sample + '/' + str(current_frame) + '.jpg')
-                image = cv2.resize(image, dsize = (128, 128))
+                image = cv2.resize(image, dsize = (112, 112))
 
                 image_stack.append(image)
             image_batch.append(image_stack)
@@ -50,10 +51,10 @@ def generate_data(training_filename, training_label, batch_size, category_name):
 
         image_np = np.array(image_batch)
         label = np.array(label_batch)
-        reshaped_image = np.reshape(image_np, (batch_size, 3, 16, 128, 128))
+        reshaped_image = np.reshape(image_np, (batch_size, 3, 16, 112, 112))
         reshaped_label = np.reshape(label, (batch_size, 200))
 
-        yield np.array(image_batch), reshaped_label
+        yield reshaped_image, reshaped_label
 
 '''
 parser = argparse.ArgumentParser()
@@ -98,32 +99,54 @@ validation_label = np.genfromtxt(csv_validation, delimiter=',', usecols=1, dtype
 
 
 model = Sequential()
-model.add(Conv3D( filters = 64, kernel_size= (3, 3, 3), strides = (1,1,1) , padding ="same", activation="relu", data_format="channels_last", input_shape = (16, 128, 128, 3)))
-#model.add(BatchNormalization())
-model.add(MaxPooling3D( pool_size = (1, 2, 2), strides=(1,2,2), padding = "valid", data_format= None))
 
-model.add(Conv3D( filters = 128, kernel_size= (3, 3, 3), strides= (1,1,1), padding= "same", activation="relu"))
-model.add(MaxPooling3D( pool_size = (2, 2, 2), strides=(2,2,2), padding = "valid", data_format= None))
-
-model.add(Conv3D( filters = 256, kernel_size= (3, 3, 3), strides= (1,1,1), padding= "same", activation="relu"))
-model.add(Conv3D( filters = 256, kernel_size= (3, 3, 3), strides= (1,1,1), padding= "same", activation="relu"))
-model.add(MaxPooling3D( pool_size = (2, 2, 2), strides=(2,2,2), padding = "valid", data_format= None))
-
-model.add(Conv3D( filters = 512, kernel_size= (3, 3, 3), strides= (1,1,1), padding= "same", activation="relu"))
-model.add(Conv3D( filters = 512, kernel_size= (3, 3, 3), strides= (1,1,1), padding= "same", activation="relu"))
-model.add(MaxPooling3D( pool_size = (2, 2, 2), strides=(2,2,2), padding = "valid", data_format= None))
-
-model.add(Conv3D( filters = 512, kernel_size= (3, 3, 3), strides= (1,1,1), padding= "same", activation="relu"))
-model.add(Conv3D( filters = 512, kernel_size= (3, 3, 3), strides= (1,1,1), padding= "same", activation="relu"))
-model.add(MaxPooling3D( pool_size = (2, 2, 2), strides=(2,2,2), padding = "valid", data_format= None))
-
+model.add(Convolution3D(64, 3, 3, 3, activation='relu',
+                        border_mode='same', name='conv1',
+                        subsample=(1, 1, 1),
+                        input_shape=(3, 16, 112, 112), data_format="channels_first" ))
+model.add(MaxPooling3D(pool_size=(1, 2, 2), strides=(1, 2, 2),
+                       border_mode='valid', name='pool1' , data_format="channels_first" ))
+# 2nd layer group
+model.add(Convolution3D(128, 3, 3, 3, activation='relu',
+                        border_mode='same', name='conv2',
+                        subsample=(1, 1, 1), data_format="channels_first" ))
+model.add(MaxPooling3D(pool_size=(2, 2, 2), strides=(2, 2, 2),
+                       border_mode='valid', name='pool2', data_format="channels_first" ))
+# 3rd layer group
+model.add(Convolution3D(256, 3, 3, 3, activation='relu',
+                        border_mode='same', name='conv3a',
+                        subsample=(1, 1, 1), data_format="channels_first" ))
+model.add(Convolution3D(256, 3, 3, 3, activation='relu',
+                        border_mode='same', name='conv3b',
+                        subsample=(1, 1, 1), data_format="channels_first" ))
+model.add(MaxPooling3D(pool_size=(2, 2, 2), strides=(2, 2, 2),
+                       border_mode='valid', name='pool3', data_format="channels_first" ))
+# 4th layer group
+model.add(Convolution3D(512, 3, 3, 3, activation='relu',
+                        border_mode='same', name='conv4a',
+                        subsample=(1, 1, 1), data_format="channels_first" ))
+model.add(Convolution3D(512, 3, 3, 3, activation='relu',
+                        border_mode='same', name='conv4b',
+                        subsample=(1, 1, 1), data_format="channels_first" ))
+model.add(MaxPooling3D(pool_size=(2, 2, 2), strides=(2, 2, 2),
+                       border_mode='valid', name='pool4', data_format="channels_first" ))
+# 5th layer group
+model.add(Convolution3D(512, 3, 3, 3, activation='relu',
+                        border_mode='same', name='conv5a',
+                        subsample=(1, 1, 1), data_format="channels_first" ))
+model.add(Convolution3D(512, 3, 3, 3, activation='relu',
+                        border_mode='same', name='conv5b',
+                        subsample=(1, 1, 1), data_format="channels_first" ))
+model.add(ZeroPadding3D(padding=(0, 1, 1), data_format="channels_first" ))
+model.add(MaxPooling3D(pool_size=(2, 2, 2), strides=(2, 2, 2),
+                       border_mode='valid', name='pool5', data_format="channels_first" ))
 model.add(Flatten())
-
-model.add(Dense( units = 4096, activation="relu"))
-model.add(Dropout(0.5))
-model.add(Dense( units = 4096, activation="relu"))
-model.add(Dropout(0.5))
-model.add(Dense( units = 487, activation="softmax"))
+# FC layers group
+model.add(Dense(4096, activation='relu', name='fc6'))
+model.add(Dropout(.5))
+model.add(Dense(4096, activation='relu', name='fc7'))
+model.add(Dropout(.5))
+model.add(Dense(487, activation='softmax', name='fc8'))
 
 model.summary()
 
@@ -150,10 +173,10 @@ model.add(Dense( units = 200, activation="softmax"))
 for i, layer in enumerate(model.layers):
     print(i, layer.name)
 
-for layer in model.layers[:13]:
+for layer in model.layers[:9]:
     layer.trainable = False
 
-for layer in model.layers[13:]:
+for layer in model.layers[9:]:
     layer.trainable = True
 
 
